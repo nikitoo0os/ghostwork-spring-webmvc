@@ -1,0 +1,231 @@
+package io.nikitoo0os.webmvc;
+
+import io.nikitoo0os.GhostWork;
+import io.nikitoo0os.entity.enums.OperationState;
+import jakarta.servlet.AsyncEvent;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockAsyncContext;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.web.servlet.HandlerMapping;
+
+import java.io.IOException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class GhostWorkRequestInterceptorTest {
+    private final GhostWork ghostWork =
+            GhostWork.create(Executors.newSingleThreadExecutor());
+    private final GhostWorkWebMvcProperties properties =
+            new GhostWorkWebMvcProperties();
+    private final GhostWorkRequestInterceptor interceptor =
+            new GhostWorkRequestInterceptor(
+                    ghostWork,
+                    new DefaultOperationNameResolver(),
+                    properties
+            );
+
+    @AfterEach
+    void close() {
+        ghostWork.executor().shutdownNow();
+    }
+
+    @Test
+    void syncRequestShouldUseTemplateAndOwnSubmittedTasks()
+            throws Exception {
+        MockHttpServletRequest request = request("GET", "/orders/42");
+        request.setAttribute(
+                HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE,
+                "/orders/{id}"
+        );
+        request.addHeader("X-Request-ID", "request-42");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        interceptor.preHandle(request, response, new Object());
+        ghostWork.executor()
+                .submit("LoadOrder", () -> {
+                })
+                .get(1, TimeUnit.SECONDS);
+        response.setStatus(201);
+        interceptor.afterCompletion(request, response, new Object(), null);
+
+        var operation = ghostWork.operations().getFirst();
+        assertEquals("GET /orders/{id}", operation.name());
+        assertEquals(OperationState.COMPLETED, operation.state());
+        assertEquals(1, ghostWork.tasks(operation.id()).size());
+        RequestMetadata metadata = (RequestMetadata) ghostWork
+                .operationDetails(operation.id())
+                .metadata();
+        assertEquals("request-42", metadata.requestId());
+        assertEquals(201, metadata.responseStatus());
+        assertFalse(metadata.async());
+    }
+
+    @Test
+    void excludedRequestShouldNotCreateOperation() throws Exception {
+        MockHttpServletRequest request = request("GET", "/actuator/health");
+        interceptor.preHandle(
+                request,
+                new MockHttpServletResponse(),
+                new Object()
+        );
+        interceptor.afterCompletion(
+                request,
+                new MockHttpServletResponse(),
+                new Object(),
+                null
+        );
+        assertTrue(ghostWork.operations().isEmpty());
+    }
+
+    @Test
+    void syncExceptionAndClientAbortShouldHaveDifferentStates()
+            throws Exception {
+        completeWithFailure(new IllegalStateException("boom"));
+        completeWithFailure(new IOException("client disconnected"));
+
+        assertTrue(ghostWork.operations().stream().anyMatch(operation ->
+                operation.state() == OperationState.FAILED));
+        assertTrue(ghostWork.operations().stream().anyMatch(operation ->
+                operation.state() == OperationState.ABORTED));
+    }
+
+    @Test
+    void resolvedServerErrorResponseShouldFailOperation() throws Exception {
+        MockHttpServletRequest request = request("GET", "/failed");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        interceptor.preHandle(request, response, new Object());
+        response.setStatus(500);
+        interceptor.afterCompletion(request, response, new Object(), null);
+
+        assertEquals(
+                OperationState.FAILED,
+                ghostWork.operations().getFirst().state()
+        );
+    }
+
+    @Test
+    void asyncRequestShouldFinishOnlyOnCompleteCallback()
+            throws Exception {
+        AsyncFixture fixture = startAsync("/deferred");
+        assertEquals(
+                OperationState.RUNNING,
+                ghostWork.operations().getFirst().state()
+        );
+
+        fixture.context.complete();
+
+        var operation = ghostWork.operations().getFirst();
+        assertEquals(OperationState.COMPLETED, operation.state());
+        RequestMetadata metadata = (RequestMetadata) ghostWork
+                .operationDetails(operation.id())
+                .metadata();
+        assertTrue(metadata.async());
+    }
+
+    @Test
+    void asyncTimeoutAndClientAbortShouldBeClassified()
+            throws Exception {
+        AsyncFixture timeout = startAsync("/timeout");
+        timeout.listener().onTimeout(new AsyncEvent(timeout.context));
+
+        AsyncFixture abort = startAsync("/stream");
+        abort.listener().onError(new AsyncEvent(
+                abort.context,
+                new IOException("broken pipe")
+        ));
+
+        assertTrue(ghostWork.operations().stream().anyMatch(operation ->
+                operation.state() == OperationState.TIMED_OUT));
+        assertTrue(ghostWork.operations().stream().anyMatch(operation ->
+                operation.state() == OperationState.ABORTED));
+    }
+
+    @Test
+    void completionAfterTimeoutShouldNotReplaceTerminalMetadata()
+            throws Exception {
+        AsyncFixture fixture = startAsync("/timeout");
+        fixture.listener().onTimeout(new AsyncEvent(fixture.context));
+        var operation = ghostWork.operations().getFirst();
+        RequestMetadata timedOut = (RequestMetadata) ghostWork
+                .operationDetails(operation.id())
+                .metadata();
+
+        fixture.response.setStatus(200);
+        fixture.listener().onComplete(new AsyncEvent(fixture.context));
+
+        assertEquals(OperationState.TIMED_OUT, operation.state());
+        assertEquals(
+                timedOut,
+                ghostWork.operationDetails(operation.id()).metadata()
+        );
+    }
+
+    @Test
+    void onStartAsyncShouldRegisterListenerOnNewContext()
+            throws Exception {
+        AsyncFixture first = startAsync("/stream");
+        MockAsyncContext second = new MockAsyncContext(
+                first.request,
+                first.response
+        );
+
+        first.listener().onStartAsync(new AsyncEvent(second));
+
+        assertEquals(1, second.getListeners().size());
+        second.complete();
+        assertEquals(
+                OperationState.COMPLETED,
+                ghostWork.operations().getFirst().state()
+        );
+    }
+
+    private void completeWithFailure(Exception failure) throws Exception {
+        MockHttpServletRequest request =
+                request("GET", "/" + failure.getClass().getSimpleName());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        interceptor.preHandle(request, response, new Object());
+        interceptor.afterCompletion(request, response, new Object(), failure);
+    }
+
+    private AsyncFixture startAsync(String path) throws Exception {
+        MockHttpServletRequest request = request("GET", path);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        request.setAsyncSupported(true);
+        interceptor.preHandle(request, response, new Object());
+        MockAsyncContext context =
+                (MockAsyncContext) request.startAsync(request, response);
+        interceptor.afterConcurrentHandlingStarted(
+                request,
+                response,
+                new Object()
+        );
+        return new AsyncFixture(request, response, context);
+    }
+
+    private static MockHttpServletRequest request(
+            String method,
+            String path
+    ) {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setMethod(method);
+        request.setRequestURI(path);
+        request.setRemoteAddr("127.0.0.1");
+        return request;
+    }
+
+    private record AsyncFixture(
+            MockHttpServletRequest request,
+            MockHttpServletResponse response,
+            MockAsyncContext context
+    ) {
+        jakarta.servlet.AsyncListener listener() {
+            return context.getListeners().getFirst();
+        }
+    }
+}
