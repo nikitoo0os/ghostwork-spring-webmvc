@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0
+
+- Aligned dependencies and compatibility documentation with GhostWork 0.8.
+- Preserved the 0.7 Servlet request and cancellation lifecycle contracts.
+
 ## 0.7.0
 
 - Connected Servlet timeout and client-abort lifecycle signals to cancellation

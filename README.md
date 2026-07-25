@@ -11,7 +11,7 @@ Automatic HTTP request lifecycle tracking for GhostWork and Spring MVC.
 
 | Web MVC integration | GhostWork | GhostWork Spring | Spring Boot | Java |
 | --- | --- | --- | --- | --- |
-| `0.7.x` | `0.7.x` | `0.7.x` | `3.4.x` | `21+` |
+| `0.8.x` | `0.8.x` | `0.8.x` | `3.4.x` | `21+` |
 
 ## Installation
 
@@ -19,7 +19,7 @@ Automatic HTTP request lifecycle tracking for GhostWork and Spring MVC.
 <dependency>
     <groupId>io.github.nikitoo0os</groupId>
     <artifactId>ghostwork-spring-webmvc</artifactId>
-    <version>0.7.0</version>
+    <version>0.8.0</version>
 </dependency>
 ```
 
@@ -137,16 +137,15 @@ Provide a custom `OperationNameResolver` bean to replace the default
 
 ## Scope
 
-Version `0.7.x` is Servlet/Spring MVC only. It does not add WebFlux, Reactor,
-scheduled executor tracking, messaging integrations, metrics, tracing,
-persistence, or distributed storage.
+Version `0.8.x` is Servlet/Spring MVC only. It does not add WebFlux, Reactor,
+messaging integrations, metrics, tracing, persistence, or distributed storage.
+Scheduling support is provided transitively by `ghostwork-spring`.
 
 ## Migration From 0.6
 
-Request ownership, metadata, operation naming, include/exclude rules, and async
-controller support are unchanged. Version 0.7 adds policy-driven cancellation
-propagation; the defaults do not cancel children after a normal response or
-controller failure.
+Request ownership, metadata, operation naming, include/exclude rules, async
+controller support, and cancellation behavior are unchanged. Version 0.8
+aligns the module with core and Spring scheduling support.
 
 ## License
 

@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.nikitoo0os</groupId>
     <artifactId>ghostwork-spring-webmvc</artifactId>
-    <version>0.7.0</version>
+    <version>0.8.0</version>
     <name>GhostWork Spring Web MVC</name>
     <description>Automatic Spring MVC request lifecycle tracking for GhostWork.</description>
     <url>https://github.com/nikitoo0os/ghostwork-spring-webmvc</url>
@@ -35,7 +35,7 @@
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.build.outputTimestamp>2026-07-25T00:00:00Z</project.build.outputTimestamp>
-        <ghostwork.version>0.7.0</ghostwork.version>
+        <ghostwork.version>0.8.0</ghostwork.version>
         <spring.boot.version>3.4.3</spring.boot.version>
     </properties>
     <dependencyManagement>
