@@ -11,7 +11,7 @@ Automatic HTTP request lifecycle tracking for GhostWork and Spring MVC.
 
 | Web MVC integration | GhostWork | GhostWork Spring | Spring Boot | Java |
 | --- | --- | --- | --- | --- |
-| `0.6.x` | `0.6.x` | `0.6.x` | `3.4.x` | `21+` |
+| `0.7.x` | `0.7.x` | `0.7.x` | `3.4.x` | `21+` |
 
 ## Installation
 
@@ -19,7 +19,7 @@ Automatic HTTP request lifecycle tracking for GhostWork and Spring MVC.
 <dependency>
     <groupId>io.github.nikitoo0os</groupId>
     <artifactId>ghostwork-spring-webmvc</artifactId>
-    <version>0.6.0</version>
+    <version>0.7.0</version>
 </dependency>
 ```
 
@@ -95,7 +95,20 @@ Terminal request states are:
 * `TIMED_OUT`
 * `ABORTED` for servlet errors caused by an `IOException` or client disconnect
 
-Client abort does not cancel child tasks.
+Request completion and child cancellation are separate dimensions:
+
+* timeout keeps the operation `TIMED_OUT` and applies `on-timeout`;
+* an observed client disconnect keeps it `ABORTED` and applies
+  `on-client-abort`;
+* controller failure keeps it `FAILED` and applies `on-operation-failure`;
+* normal completion applies `on-operation-complete`, which defaults to `NONE`.
+
+The safe defaults request cooperative cancellation after timeout or client
+abort without interrupting running tasks. A custom Spring
+`CancellationPolicy` can protect payment work, cancel only queued work, or
+interrupt selected operations. Client disconnect detection is best effort:
+Servlet containers generally expose it only when a response write or lifecycle
+callback reports an I/O failure.
 
 ## Request Metadata
 
@@ -124,9 +137,16 @@ Provide a custom `OperationNameResolver` bean to replace the default
 
 ## Scope
 
-Version `0.6.x` is Servlet/Spring MVC only. It does not add WebFlux, Reactor,
+Version `0.7.x` is Servlet/Spring MVC only. It does not add WebFlux, Reactor,
 scheduled executor tracking, messaging integrations, metrics, tracing,
 persistence, or distributed storage.
+
+## Migration From 0.6
+
+Request ownership, metadata, operation naming, include/exclude rules, and async
+controller support are unchanged. Version 0.7 adds policy-driven cancellation
+propagation; the defaults do not cancel children after a normal response or
+controller failure.
 
 ## License
 

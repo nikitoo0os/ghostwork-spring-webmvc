@@ -1,6 +1,7 @@
 package io.nikitoo0os.webmvc;
 
 import io.nikitoo0os.GhostWork;
+import io.nikitoo0os.CancellationCause;
 import io.nikitoo0os.entity.enums.OperationState;
 import jakarta.servlet.AsyncEvent;
 import org.junit.jupiter.api.AfterEach;
@@ -13,6 +14,7 @@ import org.springframework.web.servlet.HandlerMapping;
 import java.io.IOException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -147,6 +149,58 @@ class GhostWorkRequestInterceptorTest {
     }
 
     @Test
+    void asyncTimeoutShouldRequestCancellationForOwnedTask()
+            throws Exception {
+        ActiveTaskFixture fixture = startAsyncWithActiveTask("/timeout-task");
+
+        fixture.async().listener().onTimeout(
+                new AsyncEvent(fixture.async().context)
+        );
+
+        var operation = ghostWork.operations().getFirst();
+        var task = ghostWork.tasks(operation.id()).getFirst();
+        var cancellation = ghostWork.taskCancellation(task.id());
+        assertTrue(cancellation.cancellationRequested());
+        assertEquals(
+                CancellationCause.OPERATION_TIMED_OUT,
+                cancellation.cancellationCause()
+        );
+        fixture.release().countDown();
+    }
+
+    @Test
+    void clientAbortShouldRequestCancellationWithAbortCause()
+            throws Exception {
+        ActiveTaskFixture fixture = startAsyncWithActiveTask("/abort-task");
+
+        fixture.async().listener().onError(new AsyncEvent(
+                fixture.async().context,
+                new IOException("broken pipe")
+        ));
+
+        var operation = ghostWork.operations().getFirst();
+        var task = ghostWork.tasks(operation.id()).getFirst();
+        assertEquals(
+                CancellationCause.CLIENT_ABORTED,
+                ghostWork.taskCancellation(task.id()).cancellationCause()
+        );
+        fixture.release().countDown();
+    }
+
+    @Test
+    void normalAsyncCompletionShouldNotRequestTaskCancellation()
+            throws Exception {
+        ActiveTaskFixture fixture = startAsyncWithActiveTask("/complete-task");
+        fixture.release().countDown();
+        fixture.async().context.complete();
+
+        var operation = ghostWork.operations().getFirst();
+        var task = ghostWork.tasks(operation.id()).getFirst();
+        assertFalse(ghostWork.taskCancellation(task.id())
+                .cancellationRequested());
+    }
+
+    @Test
     void completionAfterTimeoutShouldNotReplaceTerminalMetadata()
             throws Exception {
         AsyncFixture fixture = startAsync("/timeout");
@@ -208,6 +262,35 @@ class GhostWorkRequestInterceptorTest {
         return new AsyncFixture(request, response, context);
     }
 
+    private ActiveTaskFixture startAsyncWithActiveTask(String path)
+            throws Exception {
+        MockHttpServletRequest request = request("GET", path);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        request.setAsyncSupported(true);
+        interceptor.preHandle(request, response, new Object());
+
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ghostWork.executor().submit("OwnedTask", () -> {
+            started.countDown();
+            release.await();
+            return null;
+        });
+        assertTrue(started.await(1, TimeUnit.SECONDS));
+
+        MockAsyncContext context =
+                (MockAsyncContext) request.startAsync(request, response);
+        interceptor.afterConcurrentHandlingStarted(
+                request,
+                response,
+                new Object()
+        );
+        return new ActiveTaskFixture(
+                new AsyncFixture(request, response, context),
+                release
+        );
+    }
+
     private static MockHttpServletRequest request(
             String method,
             String path
@@ -227,5 +310,11 @@ class GhostWorkRequestInterceptorTest {
         jakarta.servlet.AsyncListener listener() {
             return context.getListeners().getFirst();
         }
+    }
+
+    private record ActiveTaskFixture(
+            AsyncFixture async,
+            CountDownLatch release
+    ) {
     }
 }
