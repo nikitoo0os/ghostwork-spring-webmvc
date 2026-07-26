@@ -11,7 +11,7 @@ Automatic HTTP request lifecycle tracking for GhostWork and Spring MVC.
 
 | Web MVC integration | GhostWork | GhostWork Spring | Spring Boot | Java |
 | --- | --- | --- | --- | --- |
-| `0.8.x` | `0.8.x` | `0.8.x` | `3.4.x` | `21+` |
+| `0.9.x` | `0.9.x` | `0.9.x` | `3.4.x` | `21+` |
 
 ## Installation
 
@@ -19,7 +19,7 @@ Automatic HTTP request lifecycle tracking for GhostWork and Spring MVC.
 <dependency>
     <groupId>io.github.nikitoo0os</groupId>
     <artifactId>ghostwork-spring-webmvc</artifactId>
-    <version>0.8.0</version>
+    <version>0.9.0</version>
 </dependency>
 ```
 
@@ -34,6 +34,18 @@ GhostWork ghostWork() {
 ```
 
 No controller annotation, filter, or manual operation wrapper is required.
+
+Incoming `X-Correlation-ID` values are validated and propagated to the HTTP
+operation and its child tasks. Invalid or oversized values are never copied
+unchanged into telemetry; GhostWork falls back to the validated request ID or
+a generated ID.
+
+```yaml
+ghostwork:
+  web:
+    correlation-id-header: X-Correlation-ID
+    generate-correlation-id: true
+```
 
 ## Automatic HTTP Request Tracking
 
@@ -137,14 +149,14 @@ Provide a custom `OperationNameResolver` bean to replace the default
 
 ## Scope
 
-Version `0.8.x` is Servlet/Spring MVC only. It does not add WebFlux, Reactor,
+Version `0.9.x` is Servlet/Spring MVC only. It does not add WebFlux, Reactor,
 messaging integrations, metrics, tracing, persistence, or distributed storage.
 Scheduling support is provided transitively by `ghostwork-spring`.
 
 ## Migration From 0.6
 
 Request ownership, metadata, operation naming, include/exclude rules, async
-controller support, and cancellation behavior are unchanged. Version 0.8
+controller support and cancellation behavior are unchanged. Version 0.9
 aligns the module with core and Spring scheduling support.
 
 ## License

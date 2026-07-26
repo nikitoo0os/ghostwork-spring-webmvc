@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0
+
+- Added validated incoming HTTP correlation IDs.
+- Propagated correlation through request operations and asynchronous tasks.
+- Added safe fallback for invalid or oversized untrusted header values.
+- Preserved synchronous, Servlet async, timeout, and client-abort semantics.
+
 ## 0.8.0
 
 - Aligned dependencies and compatibility documentation with GhostWork 0.8.
