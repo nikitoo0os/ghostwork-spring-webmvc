@@ -12,10 +12,32 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out GhostWork Spring Web MVC
+        uses: actions/checkout@v4
+
+      - name: Check out GhostWork core
+        uses: actions/checkout@v4
+        with:
+          repository: nikitoo0os/ghostwork
+          path: .ci/ghostwork
+
+      - name: Check out GhostWork Spring
+        uses: actions/checkout@v4
+        with:
+          repository: nikitoo0os/ghostwork-spring
+          path: .ci/ghostwork-spring
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
-      - run: mvn --batch-mode clean verify
+
+      - name: Install core dependency
+        run: mvn -B -ntp -f .ci/ghostwork/pom.xml -DskipTests install
+
+      - name: Install Spring dependency
+        run: mvn -B -ntp -f .ci/ghostwork-spring/pom.xml -DskipTests install
+
+      - name: Verify GhostWork Spring Web MVC
+        run: mvn -B -ntp clean verify
