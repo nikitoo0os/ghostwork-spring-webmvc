@@ -46,6 +46,7 @@ class GhostWorkRequestInterceptorTest {
                 "/orders/{id}"
         );
         request.addHeader("X-Request-ID", "request-42");
+        request.addHeader("X-Correlation-ID", "correlation-42");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         interceptor.preHandle(request, response, new Object());
@@ -59,6 +60,7 @@ class GhostWorkRequestInterceptorTest {
         var operation = ghostWork.operations().getFirst();
         assertEquals("GET /orders/{id}", operation.name());
         assertEquals(OperationState.COMPLETED, operation.state());
+        assertEquals("correlation-42", operation.correlationId().value());
         assertEquals(1, ghostWork.tasks(operation.id()).size());
         RequestMetadata metadata = (RequestMetadata) ghostWork
                 .operationDetails(operation.id())
@@ -66,6 +68,23 @@ class GhostWorkRequestInterceptorTest {
         assertEquals("request-42", metadata.requestId());
         assertEquals(201, metadata.responseStatus());
         assertFalse(metadata.async());
+    }
+
+    @Test
+    void unsafeCorrelationHeaderShouldBeRejectedAndRegenerated()
+            throws Exception {
+        MockHttpServletRequest request = request("GET", "/orders");
+        request.addHeader("X-Correlation-ID", "unsafe\nheader");
+        request.addHeader("X-Request-ID", "request-safe");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        interceptor.preHandle(request, response, new Object());
+        interceptor.afterCompletion(request, response, new Object(), null);
+
+        assertEquals(
+                "request-safe",
+                ghostWork.operations().getFirst().correlationId().value()
+        );
     }
 
     @Test

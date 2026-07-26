@@ -3,6 +3,7 @@ package io.nikitoo0os.webmvc;
 import io.nikitoo0os.GhostWork;
 import io.nikitoo0os.OperationHandle;
 import io.nikitoo0os.OperationScope;
+import io.nikitoo0os.CorrelationId;
 import jakarta.servlet.AsyncEvent;
 import jakarta.servlet.AsyncListener;
 import jakarta.servlet.http.HttpServletRequest;
@@ -69,7 +70,8 @@ public final class GhostWorkRequestInterceptor
             RequestMetadata metadata = metadata(request, template);
             handle = ghostWork.startOperation(
                     nameResolver.resolve(metadata),
-                    metadata
+                    metadata,
+                    correlationId(request, metadata)
             );
             request.setAttribute(HANDLE, handle);
             request.setAttribute(METADATA, metadata);
@@ -185,6 +187,33 @@ public final class GhostWorkRequestInterceptor
                 null,
                 false
         );
+    }
+
+    private CorrelationId correlationId(
+            HttpServletRequest request,
+            RequestMetadata metadata
+    ) {
+        String headerName = properties.getCorrelationIdHeader();
+        String candidate = headerName == null || headerName.isBlank()
+                ? null
+                : request.getHeader(headerName);
+        if (candidate != null && !candidate.isBlank()) {
+            try {
+                return new CorrelationId(candidate);
+            } catch (IllegalArgumentException ignored) {
+                // Untrusted HTTP values never reach logs or telemetry unchanged.
+            }
+        }
+        if (metadata.requestId() != null && !metadata.requestId().isBlank()) {
+            try {
+                return new CorrelationId(metadata.requestId());
+            } catch (IllegalArgumentException ignored) {
+                // A legacy request ID may use a broader character set.
+            }
+        }
+        return properties.isGenerateCorrelationId()
+                ? CorrelationId.random()
+                : new CorrelationId("uncorrelated");
     }
 
     private static RequestMetadata metadata(HttpServletRequest request) {
