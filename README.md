@@ -19,7 +19,7 @@ Automatic HTTP request lifecycle tracking for GhostWork and Spring MVC.
 <dependency>
     <groupId>io.github.nikitoo0os</groupId>
     <artifactId>ghostwork-spring-webmvc</artifactId>
-    <version>0.9.0</version>
+    <version>0.9.1</version>
 </dependency>
 ```
 

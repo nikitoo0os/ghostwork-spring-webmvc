@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1
+
+- Aligned the Web MVC integration with GhostWork core and Spring 0.9.1.
+- Clarified the source-compatible 0.9 migration contract.
+
 ## 0.9.0
 
 - Excluded `/ghostwork/**` by default to prevent dashboard polling from
