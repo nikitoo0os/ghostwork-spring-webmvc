@@ -154,11 +154,12 @@ Version `0.9.x` is Servlet/Spring MVC only. It does not add WebFlux, Reactor,
 messaging integrations, metrics, tracing, persistence, or distributed storage.
 Scheduling support is provided transitively by `ghostwork-spring`.
 
-## Migration From 0.6
+## Migration From 0.8
 
 Request ownership, metadata, operation naming, include/exclude rules, async
 controller support and cancellation behavior are unchanged. Version 0.9
-aligns the module with core and Spring scheduling support.
+aligns the module with core and Spring scheduling support and preserves the
+existing HTTP tracking contract.
 
 ## License
 
