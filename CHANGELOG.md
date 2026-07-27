@@ -2,6 +2,8 @@
 
 ## 0.9.0
 
+- Excluded `/ghostwork/**` by default to prevent dashboard polling from
+  generating self-observation operations.
 - Added validated incoming HTTP correlation IDs.
 - Propagated correlation through request operations and asynchronous tasks.
 - Added safe fallback for invalid or oversized untrusted header values.

@@ -138,6 +138,7 @@ ghostwork:
     request-id-header: X-Request-ID
     include: []
     exclude:
+      - /ghostwork/**
       - /actuator/**
       - /swagger-ui/**
       - /v3/api-docs/**

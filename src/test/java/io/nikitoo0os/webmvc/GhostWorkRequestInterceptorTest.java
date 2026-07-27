@@ -12,6 +12,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.servlet.HandlerMapping;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.CountDownLatch;
@@ -101,6 +102,26 @@ class GhostWorkRequestInterceptorTest {
                 new Object(),
                 null
         );
+        assertTrue(ghostWork.operations().isEmpty());
+    }
+
+    @Test
+    void dashboardRequestsShouldNotCreateOperations() throws Exception {
+        for (String path : List.of(
+                "/ghostwork/",
+                "/ghostwork/api/report",
+                "/ghostwork/api/schedules",
+                "/ghostwork/api/metrics",
+                "/ghostwork/api/alerts",
+                "/ghostwork/api/events"
+        )) {
+            MockHttpServletRequest request = request("GET", path);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            interceptor.preHandle(request, response, new Object());
+            interceptor.afterCompletion(request, response, new Object(), null);
+        }
+
         assertTrue(ghostWork.operations().isEmpty());
     }
 

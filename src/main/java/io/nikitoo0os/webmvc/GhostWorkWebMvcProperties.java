@@ -14,6 +14,7 @@ public class GhostWorkWebMvcProperties {
     private boolean generateCorrelationId = true;
     private List<String> include = new ArrayList<>();
     private List<String> exclude = new ArrayList<>(List.of(
+            "/ghostwork/**",
             "/actuator/**",
             "/swagger-ui/**",
             "/v3/api-docs/**",
